@@ -1,10 +1,9 @@
 document.addEventListener("DOMContentLoaded", function () {
   const notesContainer = document.getElementById("notesContainer");
+  const searchInput = document.getElementById("searchNoteInput");
 
-  chrome.storage.local.get(null, (data) => {
-    let notesArray = Object.values(data)
-      .filter((note) => note.createdAt)
-      .sort((a, b) => b.createdAt - a.createdAt); // Sort in descending order (newest first)
+  const displayNotes = (notesArray) => {
+    notesContainer.innerHTML = ""; // Clear existing notes
 
     notesArray.forEach((note) => {
       const noteElement = document.createElement("div");
@@ -33,6 +32,27 @@ document.addEventListener("DOMContentLoaded", function () {
       noteElement.appendChild(noteDeleteBtnElement);
 
       notesContainer.appendChild(noteElement);
+    });
+  };
+
+  // Fetch and display all notes initially
+  chrome.storage.local.get(null, (data) => {
+    let notesArray = Object.values(data)
+      .filter((note) => note.createdAt)
+      .sort((a, b) => b.createdAt - a.createdAt); // Sort in descending order (newest first)
+
+    // Display all notes by default
+    displayNotes(notesArray);
+
+    // Search functionality
+    searchInput.addEventListener("input", () => {
+      const searchTerm = searchInput.value.toLowerCase();
+
+      const filteredNotes = notesArray.filter(
+        (note) => note.name.toLowerCase().includes(searchTerm) // Match the name of the note
+      );
+
+      displayNotes(filteredNotes); // Display filtered notes
     });
   });
 });
