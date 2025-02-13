@@ -1,18 +1,26 @@
 function addButton() {
   const parentDivs = document.getElementsByClassName("ph5 pb5");
-  if (parentDivs.length > 0 && !document.querySelector(".custom-btn")) {
-    // Extract user's info
+
+  // Remove existing button before adding a new one
+  const existingButton = document.querySelector(".custom-btn");
+  if (existingButton) existingButton.remove();
+
+  // Remove any existing dropdown before adding a new one**
+  const existingDropdown = document.querySelector(".custom-dropdown");
+  if (existingDropdown) existingDropdown.remove();
+
+  if (parentDivs.length > 0) {
     const name = document.querySelector(
       ".artdeco-hoverable-trigger a h1"
     )?.innerText;
     const username = window.location.pathname;
 
-    // Create button
+    console.log("Current username:", username);
+
     const button = document.createElement("button");
     button.innerText = "Did I reply?";
     button.classList.add("custom-btn");
 
-    // Create notification badge (hidden by default)
     const badge = document.createElement("span");
     Object.assign(badge.style, {
       width: "8px",
@@ -22,11 +30,10 @@ function addButton() {
       position: "absolute",
       top: "2px",
       right: "2px",
-      display: "none", // Initially hidden
+      display: "none",
     });
     button.appendChild(badge);
 
-    // LinkedIn button styling
     Object.assign(button.style, {
       backgroundColor: "#F8C77E",
       color: "#22292A",
@@ -43,7 +50,6 @@ function addButton() {
       position: "relative",
     });
 
-    // Create dropdown container (hidden by default)
     const dropdownContainer = document.createElement("div");
     dropdownContainer.classList.add("custom-dropdown");
     Object.assign(dropdownContainer.style, {
@@ -58,18 +64,15 @@ function addButton() {
       border: "1px solid #E7E7E7",
     });
 
-    // Fetch existing note
+    // Ensure we fetch the correct note when switching profiles**
     chrome.storage.local.get([username], (result) => {
       const existingMessage = result[username]?.message || "";
       if (existingMessage) {
-        badge.style.display = "block"; // Show red dot if a note exists
+        badge.style.display = "block";
       }
 
-      // Populate dropdown form
       dropdownContainer.innerHTML = `
         <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Add a Note</h3>
-        <input type="hidden" id="userName" value="${name}" style="width: 100%; padding: 8px; margin-bottom: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" readonly/>
-        <input type="hidden" id="userId" value="${username}"/>
         <textarea id="noteInput" placeholder="Your Message" style="width: 100%; padding: 8px; margin-bottom: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;" rows="4">${existingMessage}</textarea>
         <div style="display: flex; justify-content: flex-end;">
           <button id="submitForm" style="background: #0a66c2; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">Send</button>
@@ -78,58 +81,61 @@ function addButton() {
       `;
     });
 
-    // Show dropdown when button is clicked
     button.onclick = () => {
       const rect = button.getBoundingClientRect();
       dropdownContainer.style.left = `${rect.left}px`;
-      dropdownContainer.style.top = `${rect.bottom + window.scrollY + 8}px`; // 5px below the button
+      dropdownContainer.style.top = `${rect.bottom + window.scrollY + 8}px`;
       const isVisible = dropdownContainer.style.display === "block";
       dropdownContainer.style.display = isVisible ? "none" : "block";
     };
 
-    // Handle form submission
     dropdownContainer.addEventListener("click", (event) => {
       if (event.target.id === "submitForm") {
         const message = dropdownContainer.querySelector("#noteInput").value;
-        const userName = dropdownContainer.querySelector("#userName").value;
-        const userId = dropdownContainer.querySelector("#userId").value;
-        const profilePic = document.querySelector(
-          `img[alt="${userName}"]`
-        )?.src;
+        const profilePic = document.querySelector(`img[alt="${name}"]`)?.src;
         const headline = document.querySelector(
           "[data-generated-suggestion-target]"
         )?.innerText;
 
-        const data = { userName, userId, profilePic, headline, message };
+        const data = {
+          name,
+          username,
+          profilePic,
+          headline,
+          message,
+          createdAt: Date.now(),
+        };
 
         console.log("Form submitted:", data);
 
-        // Save the data in chrome.storage.local
-        chrome.storage.local.set({ [userId]: data }, () => {
+        chrome.storage.local.set({ [username]: data }, () => {
           console.log("Form data saved to chrome.storage:", data);
-
-          // Show or hide the red badge
           badge.style.display = message.trim() ? "block" : "none";
-
-          dropdownContainer.style.display = "none"; // Close dropdown
+          dropdownContainer.style.display = "none";
         });
       }
 
-      // Close dropdown when clicking cancel button
       if (event.target.id === "closeForm") {
         dropdownContainer.style.display = "none";
       }
     });
 
-    // Append dropdown to body and button to the target div
     document.body.appendChild(dropdownContainer);
     parentDivs[0].appendChild(button);
   }
 }
 
-// Observe changes to detect when the target div appears
-const observer = new MutationObserver(addButton);
+// Ensure we reset the popup when navigating to a new profile**
+let lastProfile = "";
+
+const observer = new MutationObserver(() => {
+  const currentProfile = window.location.pathname;
+  if (currentProfile !== lastProfile) {
+    lastProfile = currentProfile;
+    addButton();
+  }
+});
+
 observer.observe(document.body, { childList: true, subtree: true });
 
-// Try adding the button immediately in case the div is already available
 addButton();
